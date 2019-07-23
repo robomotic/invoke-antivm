@@ -240,3 +240,28 @@ Function checkInstalledSoftware{
     }
 }
 
+
+
+Function checkHackInstalledSoftware {
+
+    $hacktools = @("vmware", "vmtools", "vbox", "process explorer", "processhacker", "procmon", "visual basic", "fiddler", "wireshark")
+
+    $programs = Get-Software
+
+    Foreach($installed in $programs)
+    {
+
+        Foreach($hacktool in $hacktools)
+        {
+            if ($installed.DisplayName)
+            {
+                if ($installed.DisplayName.ToLower() -like "*$hacktool*") {
+
+                 return $true
+                }
+            }
+        }
+    }
+    return $false
+
+}
