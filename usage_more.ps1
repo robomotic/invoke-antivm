@@ -5,11 +5,13 @@ $checks = @(Get-Item function:checkMACAddresses,
             function:checkNICManufacturer,
             function:checkNICProductName,
             function:checkNICServiceName,
-            function:checkNICName
+            function:checkNICName,
+            function:checkRunningProcesses,
+            function:checkRunningServices
 )
 
 
-ForEach ($check in $checks)
+foreach ($check in $checks)
 {
     $found = 0
     $values = @()
@@ -23,13 +25,15 @@ ForEach ($check in $checks)
     else
     {
         Write-Host -ForegroundColor GREEN "VM NOT FOUND"
-    }
-    ForEach ($v in $values)
-    {
-        if ($v)
+        if (-not $values)
         {
-            Write-Host " - $v"
+            Write-Host " + $check"
         }
+    }
+
+    foreach ($value in $values)
+    {
+        Write-Host " + $value"
     }
 }
 

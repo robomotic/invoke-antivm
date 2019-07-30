@@ -51,7 +51,7 @@ PowerShellVersion = '2.0'
 PowerShellHostVersion = '2.0'
 
 # Script files (.ps1) that are run in the caller's environment prior to importing this module
-ScriptsToProcess = @('Invoke-AntiVM.ps1','Invoke-AntiVM-Programs.ps1','Invoke-AntiVM-CPU.ps1','Invoke-AntiVM-Network.ps1')
+ScriptsToProcess = @('Invoke-AntiVM.ps1','Invoke-AntiVM-Programs.ps1','Invoke-AntiVM-CPU.ps1','Invoke-AntiVM-Network.ps1','Invoke-AntiVM-Execution.ps1')
 
 # Functions to export from this module
 FunctionsToExport = '*'
