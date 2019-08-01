@@ -43,5 +43,5 @@ function checkCPUID_1
     Write-Host "Goodbye CPUID_1"
 }
 
-Export-ModuleMember -Function Get-CPU
-Export-ModuleMember -Function checkOldCPU
+#Export-ModuleMember -Function Get-CPU
+#Export-ModuleMember -Function checkOldCPU
