@@ -30,6 +30,22 @@ function GetPublicIP(){
     return $obj
 }
 
+function registry_values($regkey, $regvalue,$child) 
+{ 
+    if ($child -eq "no"){$key = get-item $regkey} 
+    else{$key = get-childitem $regkey} 
+    $key | 
+    ForEach-Object { 
+        $values = Get-ItemProperty $_.PSPath 
+        ForEach ($value in $_.Property) 
+        { 
+            if ($regvalue -eq "all") {$values.$value} 
+            elseif ($regvalue -eq "allname"){$value} 
+            else {$values.$regvalue;break} 
+        }
+    }
+}
+
 function GetUTDate() {
     $date = get-date
     $date = $date.ToUniversalTime();
@@ -132,6 +148,7 @@ function Generate-Info() {
     $json += "`n `"hostname`": `"" + $env:COMPUTERNAME + "`","
     $json += "`n `"InventoryDate`": `"" + $(Get-Date -format u) + "`""
 
+    $json += WMIInv "useraccounts" "Select * FROM Win32_UserAccount"
     $json += WMIInv "Battery" "Select * FROM Win32_Battery" "root\cimv2"
     $json += WMIInv "BIOS" "Select * FROM Win32_Bios" "root\cimv2"
     $json += WMIInv "CDROMDrive" "Select * FROM Win32_CDROMDrive" "root\cimv2"
@@ -157,6 +174,13 @@ function Generate-Info() {
     $json += WMIInv "VideoController" "Select * FROM Win32_VideoController" "root\cimv2"
     $json += WMIInv "Volume" "Select * FROM Win32_Volume" "root\cimv2"
     
+    
+
+
+    $json += ",`n `"LoggedUsers`":" 
+
+    $json += registry_values "hklm:\software\microsoft\windows nt\currentversion\profilelist" "profileimagepath" | ConvertTo-Json
+
     $json += ",`n `"Uptime`":" 
 
     $json += Get-Uptime | ConvertTo-Json
