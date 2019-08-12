@@ -1,45 +1,72 @@
 function checkRunningProcesses
 {
-    $procs = ''
-    $found = 0
-    $values = @()
+    $vmcounts = @{} 
 
     $procs = Get-Process
     for ($i=0; $i -lt $procs.length; $i++)
     {
-        # convert Get-Process object to string
+        # for all the processes retrieve only the normalized name
         $proc = $procs[$i].ProcessName | Out-String
-        $proc = $proc.ToLower().Trim()
+        $procname = $proc.ToLower().Trim()
         
-        if ($proc.contains("vmtoolsd"))
+        #Vmware detections
+        if (($procname -eq "vmusrvc.exe") -or ($procname -match "vmsrvc.exe"))
         {
-            $found = 1
-            $values += "VMware - $($proc)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 0
+            }
         }
-        elseif ($proc.contains("vmwaretrat"))
+        elif ($procname.contains("vmtoolsd"))
         {
-            $found = 1
-            $values += "VMware - $($proc)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
-        elseif ($proc.contains("vmwareuser"))
+        elseif (($procname -match "vmwaretray.exe") -or ($procname -eq "vmwareuser.exe"))
         {
-            $found = 1
-            $values += "VMware - $($proc)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
-        elseif ($proc.contains("vmacthlp"))
+        elseif ( ($procname.contains("vmwaretrat")) -or (procname.contains("vmacthlp")))
         {
-            $found = 1
-            $values += "VMware - $($proc)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
+
         }
-        elseif ($proc.contains("vboxservice"))
+
+        #Virtual Box detections
+        if ($procname.contains("vboxservice") -or ($procname.contains("vboxtray")))
         {
-            $found = 1
-            $values += "VirtualBox - $($proc)"
+            if( $vmcounts.virtualbox ){
+                $vmcounts.virtualbox += 1
+            }
+            else{
+                $vmcounts.virtualbox = 1
+            }
         }
-        elseif ($proc.contains("vboxtray"))
+        # Xen detections
+        if ($procname -eq "xenservice.exe")
         {
-            $found = 1
-            $values += "Virtualbox - $($proc)"
+            if( $vmcounts.xenservice ){
+                $vmcounts.xenservice += 1
+            }
+            else{
+                $vmcounts.xenservice = 1
+            }
         }
     }
     if (-NOT $values)
@@ -47,14 +74,12 @@ function checkRunningProcesses
         $values += "No matching processes found"
     }
     
-    return ($found, $values)
+    return ($vmcounts.Count, $vmcounts)
 }
 
 function checkRunningServices
 {
-    $services = ''
-    $found = 0
-    $values = @()
+    $vmcounts = @{} 
 
     $services = Get-Service
     for ($i=0; $i -lt $services.length; $i++)
@@ -65,69 +90,113 @@ function checkRunningServices
         
         if ($service.contains("vmtools"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmhgfs"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmmemctl"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmmouse"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmrawdsk"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmusbmouse"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmvss"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmscsi"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmxnet"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmx_svga"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmware tools"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
         elseif ($service.contains("vmware physical disk helper service"))
         {
-            $found = 1
-            $values += "VMware - $($service)"
+            if( $vmcounts.vmware ){
+                $vmcounts.vmware += 1
+            }
+            else{
+                $vmcounts.vmware = 1
+            }
         }
     }
-    if (-NOT $values)
-    {
-        $values += "No matching services found"
-    }
-    
-    return ($found, $values)
+
+    return ($vmcounts.Count, $vmcounts)
 }

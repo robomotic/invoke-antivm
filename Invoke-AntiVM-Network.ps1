@@ -74,7 +74,7 @@ function checkGateway
         }
         Catch
         {
-            Write-Host "How did you get here???"
+            Write-Information "How did you get here???"
         }
     }
     return $gateway    

@@ -28,7 +28,7 @@ $recent = Get-DecodeMRU -MRU "HKCU:\Software\Microsoft\Windows\CurrentVersion\Ex
         [string]$MRU 
     ) 
     Try { 
-        $items = Get-Item -Path $MRU | select -ExpandProperty Property         
+        $items = Get-Item -Path $MRU | Select-Object -ExpandProperty Property         
         $data = @() 
         foreach ($item in $items) {            
                 $name = $item           

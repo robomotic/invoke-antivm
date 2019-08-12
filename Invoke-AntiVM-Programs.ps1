@@ -1,242 +1,248 @@
 ﻿
-Function Get-Software  {
+Function Get-Software {
 
-  [OutputType('System.Software.Inventory')]
+    [OutputType('System.Software.Inventory')]
 
-  [Cmdletbinding()] 
+    [Cmdletbinding()] 
 
-  Param( 
+    Param( 
 
-  [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)] 
+        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)] 
 
-  [String[]]$Computername=$env:COMPUTERNAME
+        [String[]]$Computername = $env:COMPUTERNAME
 
-  )         
+    )         
 
-  Begin {
+    Begin {
 
-  }
+    }
 
-  Process  {     
+    Process {     
 
-  ForEach  ($Computer in  $Computername){ 
+        ForEach ($Computer in  $Computername) { 
 
-  If  (Test-Connection -ComputerName  $Computer -Count  1 -Quiet) {
+            If (Test-Connection -ComputerName  $Computer -Count  1 -Quiet) {
 
-  $Paths  = @("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall","SOFTWARE\\Wow6432node\\Microsoft\\Windows\\CurrentVersion\\Uninstall")         
+                $Paths = @("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", "SOFTWARE\\Wow6432node\\Microsoft\\Windows\\CurrentVersion\\Uninstall")         
 
-  ForEach($Path in $Paths) { 
+                ForEach ($Path in $Paths) { 
 
-  Write-Verbose  "Checking Path: $Path"
+                    Write-Verbose  "Checking Path: $Path"
 
-  #  Create an instance of the Registry Object and open the HKLM base key 
+                    #  Create an instance of the Registry Object and open the HKLM base key 
 
-  Try  { 
+                    Try { 
 
-  $reg=[microsoft.win32.registrykey]::OpenRemoteBaseKey('LocalMachine',$Computer,'Registry64') 
+                        $reg = [microsoft.win32.registrykey]::OpenRemoteBaseKey('LocalMachine', $Computer, 'Registry64') 
 
-  } Catch  { 
+                    }
+                    Catch { 
 
-  Write-Error $_ 
+                        Write-Error $_ 
 
-  Continue 
+                        Continue 
 
-  } 
+                    } 
 
-  #  Drill down into the Uninstall key using the OpenSubKey Method 
+                    #  Drill down into the Uninstall key using the OpenSubKey Method 
 
-  Try  {
+                    Try {
 
-  $regkey=$reg.OpenSubKey($Path)  
+                        $regkey = $reg.OpenSubKey($Path)  
 
-  # Retrieve an array of string that contain all the subkey names 
+                        # Retrieve an array of string that contain all the subkey names 
 
-  $subkeys=$regkey.GetSubKeyNames()      
+                        $subkeys = $regkey.GetSubKeyNames()      
 
-  # Open each Subkey and use GetValue Method to return the required  values for each 
+                        # Open each Subkey and use GetValue Method to return the required  values for each 
 
-  ForEach ($key in $subkeys){   
+                        ForEach ($key in $subkeys) {   
 
-  Write-Verbose "Key: $Key"
+                            Write-Verbose "Key: $Key"
 
-  $thisKey=$Path+"\\"+$key 
+                            $thisKey = $Path + "\\" + $key 
 
-  Try {  
+                            Try {  
 
-  $thisSubKey=$reg.OpenSubKey($thisKey)   
+                                $thisSubKey = $reg.OpenSubKey($thisKey)   
 
-  # Prevent Objects with empty DisplayName 
+                                # Prevent Objects with empty DisplayName 
 
-  $DisplayName =  $thisSubKey.getValue("DisplayName")
+                                $DisplayName = $thisSubKey.getValue("DisplayName")
 
-  If ($DisplayName  -AND $DisplayName  -notmatch '^Update  for|rollup|^Security Update|^Service Pack|^HotFix') {
+                                If ($DisplayName -AND $DisplayName -notmatch '^Update  for|rollup|^Security Update|^Service Pack|^HotFix') {
 
-  $Date = $thisSubKey.GetValue('InstallDate')
+                                    $Date = $thisSubKey.GetValue('InstallDate')
 
-  If ($Date) {
+                                    If ($Date) {
 
-  Try {
+                                        Try {
 
-  $Date = [datetime]::ParseExact($Date, 'yyyyMMdd', $Null)
+                                            $Date = [datetime]::ParseExact($Date, 'yyyyMMdd', $Null)
 
-  } Catch{
+                                        }
+                                        Catch {
 
-  Write-Warning "$($Computer): $_ <$($Date)>"
+                                            Write-Warning "$($Computer): $_ <$($Date)>"
 
-  $Date = $Null
+                                            $Date = $Null
 
-  }
+                                        }
 
-  } 
+                                    } 
 
-  # Create New Object with empty Properties 
+                                    # Create New Object with empty Properties 
 
-  $Publisher =  Try {
+                                    $Publisher = Try {
 
-  $thisSubKey.GetValue('Publisher').Trim()
+                                        $thisSubKey.GetValue('Publisher').Trim()
 
-  } 
+                                    } 
 
-  Catch {
+                                    Catch {
 
-  $thisSubKey.GetValue('Publisher')
+                                        $thisSubKey.GetValue('Publisher')
 
-  }
+                                    }
 
-  $Version = Try {
+                                    $Version = Try {
 
-  #Some weirdness with trailing [char]0 on some strings
+                                        #Some weirdness with trailing [char]0 on some strings
 
-  $thisSubKey.GetValue('DisplayVersion').TrimEnd(([char[]](32,0)))
+                                        $thisSubKey.GetValue('DisplayVersion').TrimEnd(([char[]](32, 0)))
 
-  } 
+                                    } 
 
-  Catch {
+                                    Catch {
 
-  $thisSubKey.GetValue('DisplayVersion')
+                                        $thisSubKey.GetValue('DisplayVersion')
 
-  }
+                                    }
 
-  $UninstallString =  Try {
+                                    $UninstallString = Try {
 
-  $thisSubKey.GetValue('UninstallString').Trim()
+                                        $thisSubKey.GetValue('UninstallString').Trim()
 
-  } 
+                                    } 
 
-  Catch {
+                                    Catch {
 
-  $thisSubKey.GetValue('UninstallString')
+                                        $thisSubKey.GetValue('UninstallString')
 
-  }
+                                    }
 
-  $InstallLocation =  Try {
+                                    $InstallLocation = Try {
 
-  $thisSubKey.GetValue('InstallLocation').Trim()
+                                        $thisSubKey.GetValue('InstallLocation').Trim()
 
-  } 
+                                    } 
 
-  Catch {
+                                    Catch {
 
-  $thisSubKey.GetValue('InstallLocation')
+                                        $thisSubKey.GetValue('InstallLocation')
 
-  }
+                                    }
 
-  $InstallSource =  Try {
+                                    $InstallSource = Try {
 
-  $thisSubKey.GetValue('InstallSource').Trim()
+                                        $thisSubKey.GetValue('InstallSource').Trim()
 
-  } 
+                                    } 
 
-  Catch {
+                                    Catch {
 
-  $thisSubKey.GetValue('InstallSource')
+                                        $thisSubKey.GetValue('InstallSource')
 
-  }
+                                    }
 
-  $HelpLink = Try {
+                                    $HelpLink = Try {
 
-  $thisSubKey.GetValue('HelpLink').Trim()
+                                        $thisSubKey.GetValue('HelpLink').Trim()
 
-  } 
+                                    } 
 
-  Catch {
+                                    Catch {
 
-  $thisSubKey.GetValue('HelpLink')
+                                        $thisSubKey.GetValue('HelpLink')
 
-  }
+                                    }
 
-  $Object = [pscustomobject]@{
+                                    $Object = [pscustomobject]@{
 
-  Computername = $Computer
+                                        Computername    = $Computer
 
-  DisplayName = $DisplayName
+                                        DisplayName     = $DisplayName
 
-  Version  = $Version
+                                        Version         = $Version
 
-  InstallDate = $Date
+                                        InstallDate     = $Date
 
-  Publisher = $Publisher
+                                        Publisher       = $Publisher
 
-  UninstallString = $UninstallString
+                                        UninstallString = $UninstallString
 
-  InstallLocation = $InstallLocation
+                                        InstallLocation = $InstallLocation
 
-  InstallSource  = $InstallSource
+                                        InstallSource   = $InstallSource
 
-  HelpLink = $thisSubKey.GetValue('HelpLink')
+                                        HelpLink        = $thisSubKey.GetValue('HelpLink')
 
-  EstimatedSizeMB = [decimal]([math]::Round(($thisSubKey.GetValue('EstimatedSize')*1024)/1MB,2))
+                                        EstimatedSizeMB = [decimal]([math]::Round(($thisSubKey.GetValue('EstimatedSize') * 1024) / 1MB, 2))
 
-  }
+                                    }
 
-  $Object.pstypenames.insert(0,'System.Software.Inventory')
+                                    $Object.pstypenames.insert(0, 'System.Software.Inventory')
 
-  Write-Output $Object
+                                    Write-Output $Object
 
-  }
+                                }
 
-  } Catch {
+                            }
+                            Catch {
 
-  Write-Warning "$Key : $_"
+                                Write-Warning "$Key : $_"
 
-  }   
+                            }   
 
-  }
+                        }
 
-  } Catch  {}   
+                    }
+                    Catch { }   
 
-  $reg.Close() 
+                    $reg.Close() 
 
-  }                  
+                }                  
 
-  } Else  {
+            }
+            Else {
 
-  Write-Error  "$($Computer): unable to reach remote system!"
+                Write-Error  "$($Computer): unable to reach remote system!"
 
-  }
+            }
 
-  } 
+        } 
 
-  } 
+    } 
 
 }  
 
 
-Function checkInstalledSoftware{
+Function checkInstalledSoftware {
 
     Param( 
-    [Parameter( 
-         Mandatory=$true, 
-         Position=0, 
-         ValueFromPipeline=$true, 
-            ValueFromPipelineByPropertyName=$true)] 
+        [Parameter( 
+            Mandatory = $true, 
+            Position = 0, 
+            ValueFromPipeline = $true, 
+            ValueFromPipelineByPropertyName = $true)] 
         [Int]$MAX
     ) 
-    Process{
+    Process {
         $recent = Get-Software
-         if ($recent.count -lt $MAX) {
-         return $true}
-         else {return $false}
+        if ($recent.count -lt $MAX) {
+            return $true
+        }
+        else { return $false }
     }
 }
 
@@ -248,16 +254,13 @@ Function checkHackInstalledSoftware {
 
     $programs = Get-Software
 
-    Foreach($installed in $programs)
-    {
+    Foreach ($installed in $programs) {
 
-        Foreach($hacktool in $hacktools)
-        {
-            if ($installed.DisplayName)
-            {
+        Foreach ($hacktool in $hacktools) {
+            if ($installed.DisplayName) {
                 if ($installed.DisplayName.ToLower() -like "*$hacktool*") {
 
-                 return $true
+                    return $true
                 }
             }
         }
