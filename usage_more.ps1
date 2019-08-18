@@ -6,10 +6,11 @@ $checks = @(Get-Item function:checkMACAddresses,
             function:checkNICProductName,
             function:checkNICServiceName,
             function:checkNICName,
-            function:checkRunningProcesses,
-            function:checkRunningServices
+            #function:checkRunningProcesses,
+            #function:checkRunningServices,
+            function:checkMouseMovement,
+            function:checkKeyPress
 )
-
 
 foreach ($check in $checks)
 {
@@ -36,4 +37,3 @@ foreach ($check in $checks)
         Write-Host " + $value"
     }
 }
-
