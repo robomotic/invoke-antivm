@@ -96,7 +96,33 @@ function Get-RegistryUninstallKey {
         ForEach-Object {
             $obj = New-Object psobject
             Add-Member -InputObject $obj -MemberType NoteProperty -Name GUID -Value $_.pschildname
-            Add-Member -InputObject $obj -MemberType NoteProperty -Name DisplayName -Value $_.GetValue("DisplayName")
+
+            If ($DisplayName -AND $DisplayName -notmatch '^Update  for|rollup|^Security Update|^Service Pack|^HotFix') {
+
+                $obj = New-Object psobject
+                Add-Member -InputObject $obj -MemberType NoteProperty -Name GUID -Value $_.pschildname
+                Add-Member -InputObject $obj -MemberType NoteProperty -Name DisplayName -Value $_.GetValue("DisplayName")
+    
+                $Date = $_.GetValue('InstallDate')
+    
+                If ($Date) {
+    
+                    Try {
+    
+                        $Date = [datetime]::ParseExact($Date, 'yyyyMMdd', $Null)
+    
+                    }
+                    Catch {
+    
+                        Write-Warning "$($Computer): $_ <$($Date)>"
+    
+                        $Date = $Null
+    
+                    }
+    
+                } 
+            }
+
             Add-Member -InputObject $obj -MemberType NoteProperty -Name DisplayVersion -Value $_.GetValue("DisplayVersion")
             Add-Member -InputObject $obj -MemberType NoteProperty -Name Wow6432Node? -Value "Yes"
             $results += $obj
@@ -151,6 +177,30 @@ function Get-Uptime {
     return $result
 }
 
+function Get-PSVersion {
+    if (test-path variable:psversiontable) { $psversiontable.psversion } else { [version]"1.0.0.0" }
+}
+
+function Get-Mini-Info() {
+    Param( 
+        [Parameter( 
+            Mandatory = $true, 
+            Position = 0, 
+            ValueFromPipeline = $true, 
+            ValueFromPipelineByPropertyName = $true)] 
+        [string]$Token
+    ) 
+
+    #region Inventory Classes
+    $json = " { `"id`": `"" + (Get-WmiObject Win32_ComputerSystemProduct uuid).uuid + "`","
+    $json += "`n `"Token`": `"" + $Token + "`","
+    $json += "`n `"Hostname`": `"" + $env:COMPUTERNAME + "`","
+    $json += "`n `"SnapshotDate`": `"" + $(Get-Date -format u) + "`","
+    $json += "`n `"PsVersion`": `"" + $(Get-PSVersion) + "`""
+    $json += "`n } "
+
+    return $json
+}
 
 function Get-Info() {
     Param( 
@@ -166,7 +216,7 @@ function Get-Info() {
     $json = " { `"id`": `"" + (Get-WmiObject Win32_ComputerSystemProduct uuid).uuid + "`","
     $json += "`n `"Token`": `"" + $Token + "`","
     $json += "`n `"Hostname`": `"" + $env:COMPUTERNAME + "`","
-    $json += "`n `"InventoryDate`": `"" + $(Get-Date -format u) + "`""
+    $json += "`n `"SnapshotDate`": `"" + $(Get-Date -format u) + "`""
 
     $json += WMIInv -name "useraccounts" -query "Select * FROM Win32_UserAccount"
     $json += WMIInv -name "Battery" -query "Select * FROM Win32_Battery" "root\cimv2"
@@ -200,10 +250,10 @@ function Get-Info() {
     $json += registry_values "hklm:\software\microsoft\windows nt\currentversion\profilelist" "profileimagepath" | ConvertTo-Json
 
     $json += ",`n `"Processes`":" 
-    $json += Get-Process | Select-Object ProcessName,Name,FileName,FileVersion,Path,Company,Product,Description,ProductVersion | ConvertTo-Json 
+    $json += Get-Process | Select-Object ProcessName, Name, FileName, FileVersion, Path, Company, Product, Description, ProductVersion | ConvertTo-Json 
 
     $json += ",`n `"ProcessCommandLine`":" 
-    $json += Get-CimInstance Win32_Process | Select-Object -Property Name,ProcessName,Path,CommandLine | where-object {$null -ne $_.CommandLine} | ConvertTo-Json
+    $json += Get-CimInstance Win32_Process | Select-Object -Property Name, ProcessName, Path, CommandLine | where-object { $null -ne $_.CommandLine } | ConvertTo-Json
 
     $json += ",`n `"Uptime`":" 
 

