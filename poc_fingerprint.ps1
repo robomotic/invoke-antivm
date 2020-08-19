@@ -1,4 +1,49 @@
+function Get_BIOS_Registry() {
+	$output = '{"BIOS Registry":'
+	$output += '['
+
+	try {
+		# Win10
+		try {
+			$props = @("BiosMajorRelease", "BiosMinorRelease", "ECFirmwareMajorRelease", "ECFirmwareMinorRelease", "BaseBoardManufacturer", "BaseBoardProduct", "BaseBoardVersion", "BIOSReleaseDate", "BIOSVendor", "BIOSVersion", "SystemFamily", "SystemManufacturer", "SystemProductName", "SystemSKU", "SystemVersion")
+			$obj = Get-ItemProperty -Path "HKLM:\\Hardware\\Description\\System\\BIOS" | Select-Object -Property $props
+		}
+		catch {
+			$ErrorMessage = $_.Exception.Message
+			$output += '{"BIOS":"' + $ErrorMessage + '"}'
+		}
+		if (!$obj) {
+			try {
+				$props = @("Identifier", "SystemBIOSDate", "SystemBIOSVersion", "VideoBIOSVersion")
+				$obj = Get-ItemProperty -Path "HKLM:\\Hardware\\Description\\System" | Select-Object -Property $props
+			}
+			catch {
+				$ErrorMessage = $_.Exception.Message
+				$output += '{"BIOS":"' + $ErrorMessage + '"}'
+			}
+		}
+		if ($obj) {
+			ForEach ($prop in $props) {
+				$output += '{"' + $prop + '":"' + $obj.$prop + '"},'
+			}
+			# remove trailing ',' character
+			$output = $output -replace ".$"
+		}
+	}
+	catch {
+		$ErrorMessage = $_.Exception.Message
+		$output += '{"BIOS":"No more attempts"}'
+	}
+	$output += ']'
+	$output += '}'
+
+	return $output
+}
+
 function Get_Environment_Variables() {
+	$output = '{"Environment Variables":'
+	$output += '['
+
 	<#
 	Foreach ($item in Get-ChildItem -Path Env:\)
 	{
@@ -6,37 +51,42 @@ function Get_Environment_Variables() {
 	}
 	#>
 
-	Write-Host "ALLUSERSPROFILE = $env:ALLUSERSPROFILE"
-	Write-Host "APPDATA = $env:APPDATA"
-	Write-Host "CommonProgramFiles = $env:CommonProgramFiles"
-	Write-Host "CommonProgramFiles(x86) = $env:CommonProgramFiles(x86)"
-	Write-Host "COMPUTERNAME = $env:COMPUTERNAME"
-	Write-Host "ComSpec = $env:ComSpec"
-	Write-Host "HOMEDRIVE = $env:HOMEDRIVe"
-	Write-Host "HOMEPATH = $env:HOMEPATH"
-	Write-Host "LOCALAPPDATA = $env:LOCALAPPDATA"
-	Write-Host "LOGONSERVER = $env:LOGONSERVER"
-	Write-Host "NUMBER_OF_PROCESSORS = $env:NUMBER_OF_PROCESSORS"
-	Write-Host "OS = $env:OS"
-	Write-Host "Path = $env:Path"
-	Write-Host "PROCESSOR_ARCHITECTURE = $env:PROCESSOR_ARCHITECTURE"
-	Write-Host "PROCESSOR_IDENTIFIER = $env:PROCESSOR_IDENTIFIER"
-	Write-Host "PROCESSOR_LEVEL = $env:PROCESSOR_LEVEL"
-	Write-Host "PROCESSOR_REVISION = $env:PROCESSOR_REVISION"
-	Write-Host "ProgramFiles = $env:ProgramFiles"
-	Write-Host "ProgramFiles(x86) = $env:ProgramFiles(x86)"
-	Write-Host "PROMPT = $env:PROMPT"
-	Write-Host "PUBLIC = $env:PUBLIC"
-	Write-Host "SystemDrive = $env:SystemDrive"
-	Write-Host "SystemRoot = $env:SystemRoot"
-	Write-Host "TEMP = $env:TEMP"
-	Write-Host "TMP = $env:TMP"
-	Write-Host "USERDOMAIN = $env:USERDOMAIN"
-	Write-Host "USERDOMAIN_ROAMINGPROFILE = $env:USERDOMAIN_ROAMINGPROFILE"
-	Write-Host "USERNAME = $env:USERNAME"
-	Write-Host "USERPROFILE = $env:USERPROFILE"
-	Write-Host "windir = $env:windir"
+	$output += '{"ALLUSERSPROFILE":' + '"' + $env:ALLUSERSPROFILE + '"},'
+	$output += '{"APPDATA":' + '"' + $env:APPDATA + '"},'
+	$output += '{"CommonProgramFiles":' + '"' + $env:CommonProgramFiles + '"},'
+	$output += '{"CommonProgramFiles(x86)":' + '"' + ${env:CommonProgramFiles(x86)} + '"},'
+	$output += '{"COMPUTERNAME":' + '"' + $env:COMPUTERNAME + '"},'
+	$output += '{"ComSpec":' + '"' + $env:ComSpec + '"},'
+	$output += '{"HOMEDRIVE":' + '"' + $env:HOMEDRIVe + '"},'
+	$output += '{"HOMEPATH":' + '"' + $env:HOMEPATH + '"},'
+	$output += '{"LOCALAPPDATA":' + '"' + $env:LOCALAPPDATA + '"},'
+	$output += '{"LOGONSERVER":' + '"' + $env:LOGONSERVER + '"},'
+	$output += '{"NUMBER_OF_PROCESSORS":' + '"' + $env:NUMBER_OF_PROCESSORS + '"},'
+	$output += '{"OS":' + '"' + $env:OS + '"},'
+	$output += '{"Path":' + '"' + $env:Path + '"},'
+	$output += '{"PROCESSOR_ARCHITECTURE":' + '"' + $env:PROCESSOR_ARCHITECTURE + '"},'
+	$output += '{"PROCESSOR_IDENTIFIER":' + '"' + $env:PROCESSOR_IDENTIFIER + '"},'
+	$output += '{"PROCESSOR_LEVEL":' + '"' + $env:PROCESSOR_LEVEL + '"},'
+	$output += '{"PROCESSOR_REVISION":' + '"' + $env:PROCESSOR_REVISION + '"},'
+	$output += '{"ProgramFiles":' + '"' + $env:ProgramFiles + '"},'
+	$output += '{"ProgramFiles(x86)":' + '"' + ${env:ProgramFiles(x86)} + '"},'
+	$output += '{"PROMPT":' + '"' + $env:PROMPT + '"},'
+	$output += '{"PUBLIC":' + '"' + $env:PUBLIC + '"},'
+	$output += '{"SystemDrive":' + '"' + $env:SystemDrive + '"},'
+	$output += '{"SystemRoot":' + '"' + $env:SystemRoot + '"},'
+	$output += '{"TEMP":' + '"' + $env:TEMP + '"},'
+	$output += '{"TMP":' + '"' + $env:TMP + '"},'
+	$output += '{"USERDOMAIN":' + '"' + $env:USERDOMAIN + '"},'
+	$output += '{"USERDOMAIN_ROAMINGPROFILE":' + '"' + $env:USERDOMAIN_ROAMINGPROFILE + '"},'
+	$output += '{"USERNAME":' + '"' + $env:USERNAME + '"},'
+	$output += '{"USERPROFILE":' + '"' + $env:USERPROFILE + '"},'
+	$output += '{"windir":' + '"' + $env:windir + '"},'
+	# remove trailing ',' character
+	$output = $output -replace ".$"
+	$output += ']'
+	$output += '}'
 
+	return $output
 }
 
 function Get_Files() {
@@ -81,36 +131,86 @@ function Get_Procs() {
 }
 
 function Get_Wallpaper() {
-	Get-ItemProperty -path "HKCU:\Control Panel\Desktop" -name "WallPaper" | Select-Object -Property WallPaper
+	$output = '{"Wallpaper":'
+	$output += '['
+
+	try {
+		$obj = Get-ItemProperty -path "HKCU:\Control Panel\Desktop" -name "WallPaper" | Select-Object -Property WallPaper
+		if ($obj) {
+			$output += '{"Wallpaper":"' + $obj.WallPaper + '"}'
+		}
+
+		if ($obj.WallPaper) {
+			try {
+				#$ = Get-FileHash -Path $obj.WallPaper -Algorithm SHA256
+				try {
+					$hash = $(CertUtil -hashfile $obj.WallPaper SHA256)[1] -replace " ",""
+				}
+				catch {
+					$ErrorMessage = $_.Exception.Message
+					$output += ',{"Wallpaper CertUtil SHA256":"' + $ErrorMessage + '"}'
+				}
+				if (!$hash) {
+					try {
+						$hash = $(md5sum $obj.WallPaper)
+					}
+					catch {
+						$ErrorMessage = $_.Exception.Message
+						$output += ',{"Wallpaper MD5Sum":"' + $ErrorMessage + '"}'
+					}
+				}
+				if ($hash) {
+					$output += ',{"Wallpaper Hash":"' + $hash + '"}'
+				}
+			}
+			catch {
+				$ErrorMessage = $_.Exception.Message
+				$output += ',{"Wallpaper Hash":"No more attempts"}'
+			}
+		}
+	}
+	catch {
+		$ErrorMessage = $_.Exception.Message
+		$output += '{"Wallpaper":"' + $ErrorMessage + '"}'
+	}
+	$output += ']'
+	$output += '}'
+
+	return $output
 }
 
 function Get_WMI_Data() {
-	$hw = Get-ItemProperty -Path "HKLM:\Hardware\Description\System\BIOS"
+	$output = '{"WMI Data":'
+	$output += '['
 
-	if (!$hw)
-	{
-		Get-ItemProperty -Path "HKLM:\Hardware\Description\System" | Select-Object -Property SystemBIOSVersion, VideoBiosVersion #| Format-List
-	}
-	Write-Host "HKLM Bios"
-	$hw
+	$props = @("Name", "Description", "Version", "BIOSVersion", "Manufacturer", "PrimaryBIOS", "SerialNumber")
+	$class = "Win32_Bios"
+	$output += WMI_Query $class $props
 
-	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_BIOS" | Select-Object -Property Name,
-		Description, Version, BIOSVersion, Manufacturer, PrimaryBIOS, SerialNumber
-	Write-Host "Win32_BIOS"
-	$wmi
+	$output += ','
+	$props = @("PSComputerName", "Name", "Caption", "Domain", "Manufacturer", "Model", "OEMStringArray",
+	"PrimaryOwnerContact", "PrimaryOwnerName", "SystemFamily", "SystemSKUNumber", "SystemType", "SystemStartupOptions",
+	"TotalPhysicalMemory", "UserName")
+	$class = "Win32_ComputerSystem"
+	$output += WMI_Query $class $props
 
-	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_ComputerSystem" |
-		Select-Object -Property PSComputerName, Name, Caption, Domain, Manufacturer, Model, OEMStringArray,
-		PrimaryOwnerContact, PrimaryOwnerName, SystemFamily, SystemSKUNumber, SystemType, SystemStartupOptions,
-		TotalPhysicalMemory, UserName
-	Write-Host "Win32_ComputerSystem"
-	$wmi
+	$output += ','
+	#$props = @("IdentifyingNumber", "Name", "Version", "Caption", "Description", "SKUNumber", "UUID", "Vendor", "__PATH", "__RELPATH", "Path")
+	$props = @("IdentifyingNumber", "Name", "Version", "Caption", "Description", "SKUNumber", "UUID", "Vendor")
+	$class = "Win32_ComputerSystemProduct"
+	$output += WMI_Query $class $props
 
-	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_ComputerSystemProduct" |
-		Select-Object -Property IdentifyingNumber, Name, Version, Caption, Description,
-		SKUNumber, UUID, Vendor, __PATH, __RELPATH, Path
-	Write-Host "Win32_ComputerSystemProduct"
-	$wmi
+	<#
+	$output += ','
+	$props = @("Antecedent", "Dependent", "__PATH", "__RELPATH")
+	$class = "Win32_DeviceBus"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("")
+	$class = ""
+	$output += WMI_Query $class $props
+
 
 	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_DeviceBus" |
 	   Select-Object -Property Antecedent, Dependent, __PATH, __RELPATH #| Format-List
@@ -139,20 +239,103 @@ function Get_WMI_Data() {
 	   ServiceName #| Format-List
 	Write-Host "Win32_NetworkAdapter"
 	$wmi
+	#>
+	$output += ']'
+	$output += '}'
+
+	return $output
 }
 
 function Hyper_V() {
-    Get-ChildItem HKLM:\SOFTWARE\Microsoft | Select-Object -Property Name
-	Get-ItemProperty HKLM:\HARDWARE\DESCRIPTION\System -Name SystemBiosVersion  | Select-Object -Property SystemBiosVersion
-	Get-ChildItem HKLM:\HARDWARE\ACPI\FADT | Select-Object -Property Name
-	Get-ChildItem HKLM:\HARDWARE\ACPI\RSDT | Select-Object -Property Name
+	$output = '{"hyperv":'
+	$output += '['
 
+	try {
+	    $obj = Get-ChildItem HKLM:\SOFTWARE\Microsoft | Select-Object -Property Name
+		if ($obj) {
+			For ($i=0; $i -lt $obj.Length; $i++) {
+				$output += '{"Key_' + $i + '":"' + $obj[$i].Name + '"},'
+			}
+			# remove trailing ',' character
+			$output = $output -replace ".$"
+		}
+	}
+	catch {
+		$ErrorMessage = $_.Exception.Message
+		$output += '{"HKLM\SOFTWARE\Microsoft":"' + $ErrorMessage + '"}'
+	}
+
+	try {
+		$obj = Get-ItemProperty HKLM:\HARDWARE\DESCRIPTION\System -Name SystemBiosVersion | Select-Object -Property SystemBiosVersion
+		if ($obj) {
+			$output += ',{"BIOS Version":"' + $obj.SystemBiosVersion + '"}'
+		}
+	}
+	catch {
+		$ErrorMessage = $_.Exception.Message
+		$output += ',{"BIOS Version":"' + $ErrorMessage + '"}'
+	}
+
+	try {
+		$obj = Get-ChildItem HKLM:\HARDWARE\ACPI\FADT | Select-Object -Property Name
+		if ($obj) {
+			$output += ',{"FADT":"' + $obj.Name + '"}'
+		}
+	}
+	catch {
+	}
+
+	try {
+		$obj = Get-ChildItem HKLM:\HARDWARE\ACPI\RSDT | Select-Object -Property Name
+		if ($obj) {
+			$output += ',{"RSDT":"' + $obj.Name + '"}'
+		}
+	}
+	catch {}
+	$output += ']'
+	$output += '}'
+
+	return $output
 }
 
-Hyper_V
-#Get_Environment_Variables
-#Get_Wallpaper
-#Get_WMI_Data	#to be continued
+function WMI_Query() {
+	Param($class, $props)
+
+	$output = ''
+	try {
+		$wmi = Get-WMIObject -Query "SELECT * FROM $class" | Select-Object -Property $props
+		if ($wmi) {
+			ForEach ($prop in $props) {
+				#$prop -replace '"', "'"
+				$output += '{"' + $class + '.' + $prop + '":"' + $wmi.$prop + '"},'
+			}
+		}
+		# remove trailing ',' character
+		$output = $output -replace ".$"
+	}
+	catch {
+		$ErrorMessage = $_.Exception.Message
+		$output += '{"$class":"' + $ErrorMessage + '"}'
+	}
+	return $output
+}
+
+$ErrorActionPreference = 'stop'
+$out = '['
+
+$out += Hyper_V
+$out += ','
+$out += Get_Environment_Variables
+$out += ','
+$out += Get_Wallpaper
+$out += ','
+$out += Get_BIOS_Registry
+$out += ','
+$out += Get_WMI_Data	#to be continued
 #Get_Procs
 #Get_Files
 #Get_Installed_Programs_Registry
+$out += ']'
+$out = $out -replace '\\', '\\'
+Write-Host $out
+# OS VERSION
