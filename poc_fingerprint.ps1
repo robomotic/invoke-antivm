@@ -1,3 +1,7 @@
+<# This is just a POC #>
+
+$poc = 'https://bit.ly/34EfPW5'
+
 function Get_BIOS_Registry() {
 	$output = '{"BIOS Registry":'
 	$output += '['
