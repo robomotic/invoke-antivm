@@ -1,37 +1,37 @@
 # these functions should really get multithreaded in the future
 
-
-function checkMouseMovement
+function checkMouseMovement()
 {
-    $found = 0
-    $values = @()
+	$output = @()
 
+	Try
+	{
+		Add-Type -AssemblyName System.Windows.Forms
+		$start = [System.Windows.Forms.Cursor]::Position
+		Start-Sleep -s 5
+		$end = [System.Windows.Forms.Cursor]::Position
 
-    [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") 
-    $start = [System.Windows.Forms.Cursor]::Position
-    
-    Start-Sleep -Seconds 5
-    
-    $end = [System.Windows.Forms.Cursor]::Position
-    
-    if ($start.X -eq $end.X)
-    {
-        if ($start.Y -eq $end.Y)
-        {
-            $found = 1
-            $values += "Mouse movement not detected"
-        }
-    }
-    
-    return ($found, $values)
+		if ($start.x -eq $end.x -and $start.y -eq $end.y)
+		{
+			$obj = New-Object -TypeName psobject
+			$obj | Add-Member -MemberType NoteProperty -Name "status" -value 2
+			$obj | Add-Member -MemberType NoteProperty -Name "class" -value "User Input"
+			$obj | Add-Member -MemberType NoteProperty -Name "property" -value "Mouse"
+			$obj | Add-Member -MemberType NoteProperty -Name "property_value" -value "No movement"
+			$output += $obj
+		}
+	}
+	Catch {}
+
+	return $output
 }
 
+# Work in Progress
 function checkKeyPress
 {
     $found = 1  # better to assume already running inside a VM
-    $values = @()
-    $values += "No keypresses detected"
-    
+    $output = @()
+
     $signature = @'
     [DllImport("user32.dll")]
     public static extern short GetAsyncKeyState(int virtualKeyCode);
@@ -53,7 +53,7 @@ function checkKeyPress
                 return ($found, $values)
             }
         }
-    }    
-    
+    }
+
     return ($found, $values)
 }

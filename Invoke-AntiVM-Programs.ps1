@@ -3,70 +3,70 @@ Function Get-Software {
 
     [OutputType('System.Software.Inventory')]
 
-    [Cmdletbinding()] 
+    [Cmdletbinding()]
 
-    Param( 
+    Param(
 
-        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)] 
+        [Parameter(ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True)]
 
         [String[]]$Computername = $env:COMPUTERNAME
 
-    )         
+    )
 
     Begin {
 
     }
 
-    Process {     
+    Process {
 
-        ForEach ($Computer in  $Computername) { 
+        ForEach ($Computer in  $Computername) {
 
             If (Test-Connection -ComputerName  $Computer -Count  1 -Quiet) {
 
-                $Paths = @("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", "SOFTWARE\\Wow6432node\\Microsoft\\Windows\\CurrentVersion\\Uninstall")         
+                $Paths = @("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", "SOFTWARE\\Wow6432node\\Microsoft\\Windows\\CurrentVersion\\Uninstall")
 
-                ForEach ($Path in $Paths) { 
+                ForEach ($Path in $Paths) {
 
                     Write-Verbose  "Checking Path: $Path"
 
-                    #  Create an instance of the Registry Object and open the HKLM base key 
-
-                    Try { 
-
-                        $reg = [microsoft.win32.registrykey]::OpenRemoteBaseKey('LocalMachine', $Computer, 'Registry64') 
-
-                    }
-                    Catch { 
-
-                        Write-Error $_ 
-
-                        Continue 
-
-                    } 
-
-                    #  Drill down into the Uninstall key using the OpenSubKey Method 
+                    #  Create an instance of the Registry Object and open the HKLM base key
 
                     Try {
 
-                        $regkey = $reg.OpenSubKey($Path)  
+                        $reg = [microsoft.win32.registrykey]::OpenRemoteBaseKey('LocalMachine', $Computer, 'Registry64')
 
-                        # Retrieve an array of string that contain all the subkey names 
+                    }
+                    Catch {
 
-                        $subkeys = $regkey.GetSubKeyNames()      
+                        Write-Error $_
 
-                        # Open each Subkey and use GetValue Method to return the required  values for each 
+                        Continue
 
-                        ForEach ($key in $subkeys) {   
+                    }
+
+                    #  Drill down into the Uninstall key using the OpenSubKey Method
+
+                    Try {
+
+                        $regkey = $reg.OpenSubKey($Path)
+
+                        # Retrieve an array of string that contain all the subkey names
+
+                        $subkeys = $regkey.GetSubKeyNames()
+
+                        # Open each Subkey and use GetValue Method to return the required  values for each
+
+                        ForEach ($key in $subkeys) {
 
                             Write-Verbose "Key: $Key"
 
-                            $thisKey = $Path + "\\" + $key 
+                            $thisKey = $Path + "\\" + $key
 
-                            Try {  
+                            Try {
 
-                                $thisSubKey = $reg.OpenSubKey($thisKey)   
+                                $thisSubKey = $reg.OpenSubKey($thisKey)
 
-                                # Prevent Objects with empty DisplayName 
+                                # Prevent Objects with empty DisplayName
 
                                 $DisplayName = $thisSubKey.getValue("DisplayName")
 
@@ -89,15 +89,15 @@ Function Get-Software {
 
                                         }
 
-                                    } 
+                                    }
 
-                                    # Create New Object with empty Properties 
+                                    # Create New Object with empty Properties
 
                                     $Publisher = Try {
 
                                         $thisSubKey.GetValue('Publisher').Trim()
 
-                                    } 
+                                    }
 
                                     Catch {
 
@@ -111,7 +111,7 @@ Function Get-Software {
 
                                         $thisSubKey.GetValue('DisplayVersion').TrimEnd(([char[]](32, 0)))
 
-                                    } 
+                                    }
 
                                     Catch {
 
@@ -123,7 +123,7 @@ Function Get-Software {
 
                                         $thisSubKey.GetValue('UninstallString').Trim()
 
-                                    } 
+                                    }
 
                                     Catch {
 
@@ -135,7 +135,7 @@ Function Get-Software {
 
                                         $thisSubKey.GetValue('InstallLocation').Trim()
 
-                                    } 
+                                    }
 
                                     Catch {
 
@@ -147,7 +147,7 @@ Function Get-Software {
 
                                         $thisSubKey.GetValue('InstallSource').Trim()
 
-                                    } 
+                                    }
 
                                     Catch {
 
@@ -159,7 +159,7 @@ Function Get-Software {
 
                                         $thisSubKey.GetValue('HelpLink').Trim()
 
-                                    } 
+                                    }
 
                                     Catch {
 
@@ -202,16 +202,16 @@ Function Get-Software {
 
                                 Write-Warning "$Key : $_"
 
-                            }   
+                            }
 
                         }
 
                     }
-                    Catch { }   
+                    Catch { }
 
-                    $reg.Close() 
+                    $reg.Close()
 
-                }                  
+                }
 
             }
             Else {
@@ -220,23 +220,23 @@ Function Get-Software {
 
             }
 
-        } 
+        }
 
-    } 
+    }
 
-}  
+}
 
 
 Function checkInstalledSoftware {
 
-    Param( 
-        [Parameter( 
-            Mandatory = $true, 
-            Position = 0, 
-            ValueFromPipeline = $true, 
-            ValueFromPipelineByPropertyName = $true)] 
+    Param(
+        [Parameter(
+            Mandatory = $true,
+            Position = 0,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true)]
         [Int]$MAX
-    ) 
+    )
     Process {
         $recent = Get-Software
         if ($recent.count -lt $MAX) {
@@ -251,6 +251,7 @@ Function checkInstalledSoftware {
 Function checkHackInstalledSoftware {
 
     $hacktools = @("vmware", "vmtools", "vbox", "process explorer", "processhacker", "procmon", "visual basic", "fiddler", "wireshark")
+	$output = @()
 
     $programs = Get-Software
 
@@ -259,12 +260,63 @@ Function checkHackInstalledSoftware {
         Foreach ($hacktool in $hacktools) {
             if ($installed.DisplayName) {
                 if ($installed.DisplayName.ToLower() -like "*$hacktool*") {
-
-                    return $true
+					$obj = New-Object -TypeName psobject
+					$obj | Add-Member -MemberType NoteProperty -Name "status" -value 1
+					$obj | Add-Member -MemberType NoteProperty -Name "class" -value "Installed Programs"
+					$obj | Add-Member -MemberType NoteProperty -Name "property" -value "Hacktool"
+					$obj | Add-Member -MemberType NoteProperty -Name "property_value" -value $obj
+					$output += $obj
                 }
             }
         }
     }
-    return $false
+    return $output
 
+}
+
+function checkInstalledProgramsRegistry()
+{
+	$keys = @()
+	$keys += "HKLM:\Software"
+	$keys += "HKLM:\Software\Wow6432Node"
+	$keys += "HKCU:\Software"
+	$keys += "HKCU:\Software\Wow6432Node"
+	$output = @()
+	$count = 0
+
+	Foreach ($k in $keys) {
+		$objects = Registry_Key_Query $k
+		ForEach ($obj in $objects)
+		{
+			$common = Common_String $obj
+			$count += 1
+			if ($common)
+			{
+				$obj | Add-Member -MemberType NoteProperty -Name "status" -value 1
+				$obj | Add-Member -MemberType NoteProperty -Name "class" -value "Installed Programs"
+				$obj | Add-Member -MemberType NoteProperty -Name "property" -value "Virtual"
+				$obj | Add-Member -MemberType NoteProperty -Name "property_value" -value $obj
+				$output += $obj
+			}
+			if ($obj -like "*netscape*")
+			{
+				$obj | Add-Member -MemberType NoteProperty -Name "status" -value 2
+				$obj | Add-Member -MemberType NoteProperty -Name "class" -value "Installed Programs"
+				$obj | Add-Member -MemberType NoteProperty -Name "property" -value "Browser"
+				$obj | Add-Member -MemberType NoteProperty -Name "property_value" -value $obj
+				$output += $obj
+			}
+		}
+	}
+
+	if ($count -lt 50)
+	{
+		$obj = New-Object -TypeName psobject
+		$obj | Add-Member -MemberType NoteProperty -Name "status" -value 2
+		$obj | Add-Member -MemberType NoteProperty -Name "class" -value "Installed Programs"
+		$obj | Add-Member -MemberType NoteProperty -Name "property" -value "Count"
+		$obj | Add-Member -MemberType NoteProperty -Name "property_value" -value $count
+		$output += $obj
+	}
+	return $output
 }

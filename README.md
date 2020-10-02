@@ -30,10 +30,14 @@ Usage
 -----
 Usage examples are provided in the following scripts:
 
+* detect.ps1: this shows an example script of how to call the different tests
 * usage.ps1: this shows basic usage
 * usage_more.ps1: this shows more advanced functions
 * usage_exfil.ps1: this shows how to exfiltrate host information as a json document via pastebin, web or email
 * usage_fingerprint_file.ps1: this shows the exfiltration module and what data is generated in the form of a json document
+* poc_fingerprint_combined.ps1: this shows the fingerprinting module used against online sandboxes
+* output/poc.docm: this shows an example MS Word attack with a macro to call the fingerprinting module (uploaded previously to a server)
+
 
 The folder pastebin contains a python script:
 
